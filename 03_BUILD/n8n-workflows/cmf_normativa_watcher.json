@@ -1,0 +1,39 @@
+{
+  "name": "FinanciA - CMF Normativa Watcher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 6 * * *" }] }
+      },
+      "id": "cron",
+      "name": "Cron 06:00 CLT",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLIC_BASE_URL }}/internal/regulations/check-new",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-internal-secret", "value": "={{ $env.INTERNAL_SECRET }}" }
+          ]
+        },
+        "options": { "timeout": 300000 }
+      },
+      "id": "check",
+      "name": "Check new regulations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Cron 06:00 CLT": { "main": [[{ "node": "Check new regulations", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "production" }],
+  "active": false
+}

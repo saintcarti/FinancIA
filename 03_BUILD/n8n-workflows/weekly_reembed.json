@@ -1,0 +1,38 @@
+{
+  "name": "FinanciA - Weekly Re-embedding",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 3 * * 1" }] }
+      },
+      "id": "cron",
+      "name": "Lun 03:00 CLT",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLIC_BASE_URL }}/internal/embeddings/reembed-all",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-internal-secret", "value": "={{ $env.INTERNAL_SECRET }}" }
+          ]
+        },
+        "options": { "timeout": 1800000 }
+      },
+      "id": "reembed",
+      "name": "Trigger re-embed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Lun 03:00 CLT": { "main": [[{ "node": "Trigger re-embed", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

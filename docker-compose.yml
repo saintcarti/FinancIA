@@ -1,0 +1,54 @@
+version: '3.9'
+
+# Setup local de desarrollo: Redis + n8n + backend + frontend.
+# Supabase NO se levanta local — usa el proyecto cloud de Supabase.
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+    volumes:
+      - redis-data:/data
+    command: ['redis-server', '--save', '60', '1', '--loglevel', 'warning']
+
+  backend:
+    build: ./03_BUILD/app/backend
+    ports: ['3001:3001']
+    env_file: ./03_BUILD/app/backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on: [redis]
+    volumes:
+      - ./03_BUILD/prompts:/app/prompts:ro
+
+  frontend:
+    build: ./03_BUILD/app/frontend
+    ports: ['3000:3000']
+    env_file: ./03_BUILD/app/frontend/.env
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:3001
+    depends_on: [backend]
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports: ['5678:5678']
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./03_BUILD/n8n-workflows:/workflows:ro
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_BASIC_AUTH_ACTIVE: 'true'
+      N8N_BASIC_AUTH_USER: admin
+      N8N_BASIC_AUTH_PASSWORD: changeme
+      PUBLIC_BASE_URL: http://backend:3001
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+    depends_on: [backend]
+
+volumes:
+  redis-data:
+  n8n-data:

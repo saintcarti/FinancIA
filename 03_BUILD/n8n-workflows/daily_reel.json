@@ -1,0 +1,158 @@
+{
+  "name": "FinanciA - Daily Reel",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] }
+      },
+      "id": "trigger-cron",
+      "name": "Cron 09:00 CLT",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PUBLIC_BASE_URL }}/api/cmf/uf",
+        "options": { "timeout": 8000 }
+      },
+      "id": "fetch-uf",
+      "name": "Fetch UF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PUBLIC_BASE_URL }}/api/cmf/ipc",
+        "options": { "timeout": 8000 }
+      },
+      "id": "fetch-ipc",
+      "name": "Fetch IPC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 320]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PUBLIC_BASE_URL }}/api/cmf/tpm",
+        "options": { "timeout": 8000 }
+      },
+      "id": "fetch-tpm",
+      "name": "Fetch TPM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 440]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 1500,\n  \"system\": \"Eres el guionista de FinancIA Chile. Devuelve ÚNICAMENTE un JSON válido con campos: topic, hook, body, cta, caption, hashtags. Hook ≤ 8 palabras. Body 100-130 palabras. CTA invita a DM. Caption ≤ 200 palabras. 5-7 hashtags relevantes. NO recomiendes productos ni inversiones. Cita CMF cuando aplique.\",\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": \"Datos de hoy:\\nUF: {{ $node[\\\"Fetch UF\\\"].json.value }} ({{ $node[\\\"Fetch UF\\\"].json.date }})\\nIPC último mes: {{ $node[\\\"Fetch IPC\\\"].json.value }}%\\nTPM vigente: {{ $node[\\\"Fetch TPM\\\"].json.value }}%\\n\\nGenera el script del Reel de hoy.\"\n  }]\n}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "claude-script",
+      "name": "Sonnet — Script",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content[0].text;\nconst json = JSON.parse(text.match(/\\{[\\s\\S]*\\}/)[0]);\nfor (const k of ['topic','hook','body','cta','caption','hashtags']) {\n  if (!(k in json)) throw new Error('missing field: ' + k);\n}\nreturn { json };"
+      },
+      "id": "validate",
+      "name": "Validate JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/text-to-speech/{{ $env.ELEVENLABS_VOICE_ID }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key", "value": "={{ $env.ELEVENLABS_API_KEY }}" },
+            { "name": "content-type", "value": "application/json" },
+            { "name": "accept", "value": "audio/mpeg" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $json.hook }}. {{ $json.body }} {{ $json.cta }}\",\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": { \"stability\": 0.5, \"similarity_boost\": 0.7 }\n}",
+        "options": { "response": { "response": { "responseFormat": "file" } }, "timeout": 60000 }
+      },
+      "id": "tts",
+      "name": "TTS ElevenLabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1140, 320]
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -y -i {{ $binary.data.fileName }} -loop 1 -i /assets/cover.png -filter_complex \"[1:v]scale=1080:1920[v]\" -map \"[v]\" -map 0:a -c:v libx264 -tune stillimage -c:a aac -b:a 192k -shortest -pix_fmt yuv420p /tmp/reel_{{ $now.format('YYYYMMDD') }}.mp4"
+      },
+      "id": "ffmpeg",
+      "name": "ffmpeg compose",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1360, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLIC_BASE_URL }}/internal/reel/publish",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-internal-secret", "value": "={{ $env.INTERNAL_SECRET }}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"video_path\": \"/tmp/reel_{{ $now.format('YYYYMMDD') }}.mp4\",\n  \"caption\": \"{{ $node[\\\"Validate JSON\\\"].json.caption }}\",\n  \"hashtags\": {{ JSON.stringify($node[\"Validate JSON\"].json.hashtags) }},\n  \"topic\": \"{{ $node[\\\"Validate JSON\\\"].json.topic }}\",\n  \"script\": \"{{ $node[\\\"Validate JSON\\\"].json.body }}\"\n}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "publish",
+      "name": "Publish to IG",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1580, 320]
+    }
+  ],
+  "connections": {
+    "Cron 09:00 CLT": {
+      "main": [[
+        { "node": "Fetch UF", "type": "main", "index": 0 },
+        { "node": "Fetch IPC", "type": "main", "index": 0 },
+        { "node": "Fetch TPM", "type": "main", "index": 0 }
+      ]]
+    },
+    "Fetch UF": { "main": [[{ "node": "Sonnet — Script", "type": "main", "index": 0 }]] },
+    "Fetch IPC": { "main": [[{ "node": "Sonnet — Script", "type": "main", "index": 0 }]] },
+    "Fetch TPM": { "main": [[{ "node": "Sonnet — Script", "type": "main", "index": 0 }]] },
+    "Sonnet — Script": { "main": [[{ "node": "Validate JSON", "type": "main", "index": 0 }]] },
+    "Validate JSON": { "main": [[{ "node": "TTS ElevenLabs", "type": "main", "index": 0 }]] },
+    "TTS ElevenLabs": { "main": [[{ "node": "ffmpeg compose", "type": "main", "index": 0 }]] },
+    "ffmpeg compose": { "main": [[{ "node": "Publish to IG", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "production" }, { "name": "daily" }],
+  "active": false
+}
