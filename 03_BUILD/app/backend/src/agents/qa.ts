@@ -4,6 +4,7 @@ import { TOOLS, executeTool } from './tools.js';
 import { prompt } from './prompts.js';
 import { classify } from './classifier.js';
 import { retrieve, formatContext, maxScore } from '../services/rag.js';
+import { lookupFaq } from '../services/faq.js';
 import { applyDisclaimer, passesGuardrails } from './guardrails.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
@@ -28,6 +29,29 @@ const MAX_ITERATIONS = 4;
 
 export async function runQA(opts: RunOpts): Promise<RunResult> {
   const cfg = config();
+
+  // FAQ shortcut: si la pregunta es muy similar a una FAQ pre-respondida (>0.92 sim),
+  // devolvemos la respuesta cacheada → latencia ~200ms, costo ~0.
+  // Solo aplicamos a turnos sin historial profundo (saludos primer turno).
+  if (!opts.recentHistory?.length || opts.recentHistory.length < 2) {
+    try {
+      const faq = await lookupFaq(opts.userMessage);
+      if (faq) {
+        logger.info({ similarity: faq.similarity, faq_id: faq.id }, 'faq cache hit');
+        return {
+          text: faq.answer,
+          cost_usd: 0,
+          model_used: 'faq-cache' as ModelId,
+          tool_calls_made: 0,
+          rag_top_score: faq.similarity,
+          iterations: 0
+        };
+      }
+    } catch (e) {
+      logger.debug({ err: (e as Error).message }, 'faq lookup non-critical failure');
+    }
+  }
+
   const complexity = await classify(opts.userMessage);
   const model: ModelId = (complexity === 'complex'
     ? cfg.SONNET_MODEL

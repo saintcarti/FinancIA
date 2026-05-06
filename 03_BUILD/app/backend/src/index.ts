@@ -8,7 +8,10 @@ import { zernioRouter } from './webhooks/zernio.js';
 import { adminRouter } from './routes/admin.js';
 import { publicRouter } from './routes/public.js';
 import { internalRouter } from './routes/internal.js';
+import { demoRouter } from './routes/demo.js';
+import { metricsRouter } from './routes/metrics.js';
 import { startMessageWorker } from './workers/queue.js';
+import { startCleanupCron } from './workers/cleanup.js';
 
 const cfg = config();
 
@@ -26,6 +29,8 @@ app.use(express.json({ limit: '1mb' }));
 
 app.use('/api', publicRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/demo', demoRouter);
+app.use('/api/metrics', metricsRouter);
 app.use('/internal', internalRouter);
 
 // Internal health
@@ -41,6 +46,7 @@ app.listen(port, () => {
   logger.info({ port, env: cfg.NODE_ENV }, 'server listening');
   startMessageWorker();
   logger.info('message worker started');
+  startCleanupCron();
 });
 
 process.on('uncaughtException', (err) => {

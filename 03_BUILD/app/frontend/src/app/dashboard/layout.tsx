@@ -3,13 +3,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { LogOut, MessageSquare, BarChart3, Film, FileText } from 'lucide-react';
+import { LogOut, MessageSquare, BarChart3, Film, FileText, FlaskConical } from 'lucide-react';
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { href: '/dashboard/conversations', label: 'Conversaciones', icon: MessageSquare },
   { href: '/dashboard/reels', label: 'Reels', icon: Film },
-  { href: '/dashboard/regulations', label: 'Normativa', icon: FileText }
+  { href: '/dashboard/regulations', label: 'Normativa', icon: FileText },
+  { href: '/dashboard/evals', label: 'Evals', icon: FlaskConical }
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

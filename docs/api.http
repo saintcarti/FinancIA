@@ -1,0 +1,127 @@
+### FinancIA Chile — API HTTP collection (VS Code REST Client / IntelliJ HTTP)
+### Reemplaza @baseUrl con tu URL local o producción
+
+@baseUrl = http://localhost:3001
+@internalSecret = TU_INTERNAL_SECRET_DEL_ENV
+@adminToken = TOKEN_JWT_SUPABASE  # Obtener con magic link en /
+
+### Health
+GET {{baseUrl}}/api/health
+
+### CMF — UF de hoy
+GET {{baseUrl}}/api/cmf/uf
+
+### CMF — IPC último mes
+GET {{baseUrl}}/api/cmf/ipc
+
+### CMF — TPM
+GET {{baseUrl}}/api/cmf/tpm
+
+### CMF — Verificar entidad
+GET {{baseUrl}}/api/cmf/entity?name=Banco%20de%20Chile
+
+### Demo — Chat single turn
+POST {{baseUrl}}/api/demo/chat
+Content-Type: application/json
+x-internal-secret: {{internalSecret}}
+
+{
+  "message": "¿Qué es la UF?"
+}
+
+### Demo — Chat with history
+POST {{baseUrl}}/api/demo/chat
+Content-Type: application/json
+x-internal-secret: {{internalSecret}}
+
+{
+  "message": "y la TPM?",
+  "history": [
+    {"role": "user", "content": "¿Qué es la UF?"},
+    {"role": "assistant", "content": "La UF es una unidad de cuenta reajustable según el IPC..."}
+  ]
+}
+
+### Demo — Conversación multi-turno
+POST {{baseUrl}}/api/demo/conversation
+Content-Type: application/json
+x-internal-secret: {{internalSecret}}
+
+{
+  "messages": [
+    {"role": "user", "content": "Mi banco me cobra $4500 por mantención"},
+    {"role": "user", "content": "¿es legal?"}
+  ]
+}
+
+### Demo — Status del corpus
+GET {{baseUrl}}/api/demo/status
+x-internal-secret: {{internalSecret}}
+
+### Métricas
+GET {{baseUrl}}/api/metrics
+x-internal-secret: {{internalSecret}}
+
+### Métricas Prometheus
+GET {{baseUrl}}/api/metrics/prom
+x-internal-secret: {{internalSecret}}
+
+### Admin — Listar conversaciones (requiere JWT)
+GET {{baseUrl}}/api/admin/conversations?limit=20
+Authorization: Bearer {{adminToken}}
+
+### Admin — Detalle de conversación
+GET {{baseUrl}}/api/admin/conversations/CONV_UUID_AQUI
+Authorization: Bearer {{adminToken}}
+
+### Admin — Override manual
+POST {{baseUrl}}/api/admin/conversations/CONV_UUID_AQUI/override
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "message": "Hola, soy un humano del equipo y te respondo personalmente."
+}
+
+### Admin — Métricas diarias
+GET {{baseUrl}}/api/admin/metrics/daily?from=2026-05-01&to=2026-05-06
+Authorization: Bearer {{adminToken}}
+
+### Admin — Top topics
+GET {{baseUrl}}/api/admin/metrics/topics
+Authorization: Bearer {{adminToken}}
+
+### Admin — Lista de Reels
+GET {{baseUrl}}/api/admin/reels
+Authorization: Bearer {{adminToken}}
+
+### Admin — Trigger generate Reel
+POST {{baseUrl}}/api/admin/reels/regenerate
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "publish": false
+}
+
+### Admin — Lista normativa
+GET {{baseUrl}}/api/admin/regulations
+Authorization: Bearer {{adminToken}}
+
+### Admin — Cost summary últimos 7 días
+GET {{baseUrl}}/api/admin/cost-summary?days=7
+Authorization: Bearer {{adminToken}}
+
+### Internal — Reel publish (para n8n)
+POST {{baseUrl}}/internal/reel/publish
+Content-Type: application/json
+x-internal-secret: {{internalSecret}}
+
+{
+  "video_url": "https://example.com/reel.mp4",
+  "account_id": "ZERNIO_IG_ACCOUNT_ID",
+  "caption": "Caption",
+  "hashtags": ["FinanzasChile", "CMF"],
+  "topic": "UF de hoy",
+  "script": "El cuerpo del guión"
+}

@@ -12,7 +12,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "ingest:cmf": "tsx scripts/ingest-cmf.ts",
-    "eval:rag": "tsx scripts/eval-rag.ts"
+    "ingest:extra": "tsx scripts/corpus-extra.ts",
+    "ingest:all": "npm run ingest:cmf && npm run ingest:extra && npm run seed:faq",
+    "seed:faq": "tsx scripts/seed-faq.ts",
+    "eval:rag": "tsx scripts/eval-rag.ts",
+    "eval:quick": "tsx scripts/eval-rag.ts -- --quick",
+    "validate": "tsx scripts/validate.ts",
+    "generate-reel": "tsx scripts/generate-reel.ts",
+    "generate-reel:dry": "tsx scripts/generate-reel.ts -- --dry"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
@@ -30,7 +37,8 @@
     "pdf-parse": "^1.1.1",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@vitest/coverage-v8": "^2.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
