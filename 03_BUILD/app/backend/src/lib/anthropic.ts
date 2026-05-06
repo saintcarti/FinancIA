@@ -39,12 +39,21 @@ export interface CallResult {
   call_id: string;
 }
 
+// Lectura tolerante de campos de cache: existen en SDK ≥ 0.32 con prompt caching beta/stable.
+// En SDK 0.30 no están en el tipo Usage; los leemos por cast para no romper compilación.
+type CacheUsage = { cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+function getCacheTokens(usage: Anthropic.Usage): { read: number; write: number } {
+  const u = usage as unknown as CacheUsage;
+  return { read: u.cache_read_input_tokens ?? 0, write: u.cache_creation_input_tokens ?? 0 };
+}
+
 function calcCost(model: ModelId, usage: Anthropic.Usage): number {
   const p = PRICING[model];
   const inp = ((usage.input_tokens ?? 0) * p.input) / 1_000_000;
   const out = ((usage.output_tokens ?? 0) * p.output) / 1_000_000;
-  const cr = ((usage.cache_read_input_tokens ?? 0) * p.cache_read) / 1_000_000;
-  const cw = ((usage.cache_creation_input_tokens ?? 0) * p.cache_write) / 1_000_000;
+  const cache = getCacheTokens(usage);
+  const cr = (cache.read * p.cache_read) / 1_000_000;
+  const cw = (cache.write * p.cache_write) / 1_000_000;
   return Number((inp + out + cr + cw).toFixed(6));
 }
 
@@ -70,8 +79,8 @@ export async function call(opts: CallOpts): Promise<CallResult> {
       purpose: opts.purpose,
       input_tokens: response.usage.input_tokens ?? 0,
       output_tokens: response.usage.output_tokens ?? 0,
-      cache_read_tokens: response.usage.cache_read_input_tokens ?? 0,
-      cache_write_tokens: response.usage.cache_creation_input_tokens ?? 0,
+      cache_read_tokens: getCacheTokens(response.usage).read,
+      cache_write_tokens: getCacheTokens(response.usage).write,
       cost_usd,
       latency_ms,
       tool_calls: response.content.filter((c) => c.type === 'tool_use')

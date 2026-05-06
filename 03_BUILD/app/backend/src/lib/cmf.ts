@@ -142,9 +142,14 @@ export async function getMaxConventionalRate(
     automotriz: 18.5,
     hipotecario: 8.5
   };
-  const tmc = product === 'consumo'
-    ? amountClp <= 5_000_000 ? tmcTable.consumo_low : tmcTable.consumo_high
-    : tmcTable[product] ?? 30.0;
+  // noUncheckedIndexedAccess hace que el indexed access devuelva number|undefined.
+  // Default 30.0 cubre TODAS las ramas.
+  const tmc: number =
+    (product === 'consumo'
+      ? amountClp <= 5_000_000
+        ? tmcTable.consumo_low
+        : tmcTable.consumo_high
+      : tmcTable[product]) ?? 30.0;
   return {
     tmc_annual_pct: tmc,
     reference_period: new Date().toISOString().slice(0, 7)

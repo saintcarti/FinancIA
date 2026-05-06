@@ -62,20 +62,20 @@ export async function runQA(opts: RunOpts): Promise<RunResult> {
   const topScore = maxScore(chunks);
   const ragContext = formatContext(chunks);
 
-  // System: 4 segmentos cacheados + 1 dinámico (RAG)
+  // System: 4 segmentos.
+  // NOTA: prompt caching desactivado en Q1 (requiere SDK ≥ 0.32). Activar cuando se actualice
+  // @anthropic-ai/sdk añadiendo `cache_control: { type: 'ephemeral' }` a los 2 primeros bloques.
   const system: Anthropic.MessageCreateParams['system'] = [
     {
       type: 'text',
-      text: prompt('system_qa'),
-      cache_control: { type: 'ephemeral' }
+      text: prompt('system_qa')
     },
     {
       type: 'text',
       text:
         '<conversation_summary>\n' +
         (opts.conversationSummary?.trim() || 'Primera interacción del usuario.') +
-        '\n</conversation_summary>',
-      cache_control: { type: 'ephemeral' }
+        '\n</conversation_summary>'
     },
     {
       type: 'text',
