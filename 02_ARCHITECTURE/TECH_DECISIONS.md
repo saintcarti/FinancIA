@@ -52,11 +52,19 @@
 **Decision:** n8n self-host en Railway $5/mes. Workflows versionados en `/n8n-workflows/*.json`.
 **Consequences:** Backup manual de workflows en git. Si Railway cae, workflows se recuperan via import JSON.
 
-## ADR-009: WhatsApp Cloud API (no Twilio, no 360dialog)
-**Status:** Accepted
-**Context:** Costo por mensaje y velocidad de aprobación de templates.
-**Decision:** Meta WhatsApp Business Cloud API directo. 1.000 conversaciones/mes free. Plantillas aprobadas en ~24h.
-**Consequences:** Misma plataforma que Instagram (1 token, 1 SDK). Si Meta nos suspende, todo cae junto — riesgo concentrado. Mitigación: tener fallback Twilio configurado pero inactivo.
+## ADR-009: Zernio para Instagram + WhatsApp (no Meta directo, no Twilio)
+**Status:** Accepted (revisado 2026-05-06)
+**Context:** Setup directo con Meta requiere developer app + business verification (2-14 días) + token rotation cada 60 días + 6+ env vars distintos. Para un hackathon con plazo de 48h, es bloqueador.
+**Decision:** Usar Zernio como capa de abstracción. 1 API key (`ZERNIO_API_KEY`) + 1 webhook secret (`ZERNIO_WEBHOOK_SECRET`). Conexión via Embedded Signup desde el dashboard.
+**Consequences:**
+- ✅ Time-to-first-message: minutos en vez de días
+- ✅ Misma API para Instagram DM y WhatsApp (`POST /v1/inbox/conversations/:id/messages`)
+- ✅ Token rotation gestionado por Zernio
+- ⚠️ Dependencia de proveedor adicional (Zernio puede caer)
+- ⚠️ Costo: plataforma fee de Zernio + Meta fee per-message (revisar pricing)
+- ⚠️ Reels publish menos documentado en Zernio que en Meta directo — validar en deploy
+
+**Migración a Meta directo:** posible en Q2 si volumen lo justifica. La capa `lib/zernio.ts` aísla la integración.
 
 ## ADR-010: Generación de Reels: TTS + ffmpeg, no Runway/Sora
 **Status:** Accepted (Q1)

@@ -1,18 +1,16 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 beforeAll(() => {
-  process.env.META_APP_SECRET = 'test_secret_long_enough_for_validation';
-  process.env.META_VERIFY_TOKEN = 'verify123';
-  process.env.META_PAGE_ACCESS_TOKEN = 'page_access_token_long_enough';
-  process.env.IG_USER_ID = '12345';
-  process.env.WHATSAPP_PHONE_NUMBER_ID = '67890';
-  process.env.WHATSAPP_ACCESS_TOKEN = 'wa_access_token_long_enough';
-  process.env.SUPABASE_URL = 'https://x.supabase.co';
-  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service_role_key_long_enough';
-  process.env.SUPABASE_ANON_KEY = 'anon_key_long_enough';
-  process.env.ANTHROPIC_API_KEY = 'sk-ant-' + 'x'.repeat(40);
-  process.env.GOOGLE_AI_STUDIO_API_KEY = 'AIza' + 'x'.repeat(20);
-  process.env.INTERNAL_SECRET = 'a'.repeat(20);
+  Object.assign(process.env, {
+    ZERNIO_API_KEY: 'zer_' + 'x'.repeat(20),
+    ZERNIO_WEBHOOK_SECRET: 'whsec_' + 'a'.repeat(20),
+    SUPABASE_URL: 'https://x.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'service_role_key_long_enough',
+    SUPABASE_ANON_KEY: 'anon_key_long_enough',
+    ANTHROPIC_API_KEY: 'sk-ant-' + 'x'.repeat(40),
+    GOOGLE_AI_STUDIO_API_KEY: 'AIza' + 'x'.repeat(20),
+    INTERNAL_SECRET: 'a'.repeat(20)
+  });
 });
 
 vi.mock('../src/lib/anthropic', () => ({

@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { supabase } from '../lib/supabase.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
-import { sendInstagramMessage, sendWhatsAppMessage } from '../lib/meta.js';
+import { replyToConversation } from '../lib/zernio.js';
 import { reelQueue, ingestQueue } from '../workers/queue.js';
 
 export const adminRouter = Router();
@@ -75,17 +75,13 @@ adminRouter.post('/conversations/:id/override', async (req, res) => {
 
   const { data: conv } = await supabase()
     .from('conversations')
-    .select('user_id, channel')
+    .select('user_id, channel, provider_conversation_id')
     .eq('id', req.params.id)
     .single();
   if (!conv) return res.status(404).json({ error: { message: 'not found' } });
-
-  const { data: user } = await supabase()
-    .from('app_users')
-    .select('external_id')
-    .eq('id', conv.user_id)
-    .single();
-  if (!user) return res.status(404).json({ error: { message: 'user not found' } });
+  if (!conv.provider_conversation_id) {
+    return res.status(409).json({ error: { message: 'conversation has no provider id, cannot reply' } });
+  }
 
   // Pausar bot 24h
   await supabase()
@@ -93,12 +89,7 @@ adminRouter.post('/conversations/:id/override', async (req, res) => {
     .update({ human_in_loop_until: new Date(Date.now() + 24 * 3600_000).toISOString() })
     .eq('id', conv.user_id);
 
-  // Enviar el mensaje
-  if (conv.channel === 'instagram') {
-    await sendInstagramMessage(user.external_id, message);
-  } else {
-    await sendWhatsAppMessage(user.external_id, message);
-  }
+  await replyToConversation(conv.provider_conversation_id, message);
 
   await supabase().from('messages').insert({
     conversation_id: req.params.id,

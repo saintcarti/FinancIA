@@ -37,26 +37,26 @@
 2. Copiar `REDIS_URL`
 3. Habilitar TLS
 
-### Paso 3 — Meta Developer App
-1. Crear App en developers.facebook.com → tipo "Business"
-2. Agregar productos:
-   - Instagram Graph API
-   - Webhooks
-   - WhatsApp Business
-3. Conectar página Facebook → Instagram Business Account
-4. Generar:
-   - Page Access Token (long-lived) → `META_PAGE_ACCESS_TOKEN`
-   - App Secret → `META_APP_SECRET`
-5. Webhooks:
-   - Subscribe `instagram` events
-   - Suscriptarse a: `messages`, `messaging_postbacks`, `comments`
-   - Callback URL: `https://api.financia-chile.cl/webhook/instagram`
-   - Verify Token: lo que defines en `.env`
-   - Click "Verify and Save" → backend debe estar live
-6. Repetir para WhatsApp:
-   - Agregar número de prueba
-   - Verificar (Meta envía SMS)
-   - Solicitar templates de bienvenida (24h aprobación)
+### Paso 3 — Zernio (gestiona Instagram + WhatsApp)
+Zernio reemplaza la integración directa con Meta. 1 sola API key, sin developer app review, sin business verification 2-14 días, sin token rotation.
+
+1. Registrarse en https://zernio.com
+2. Dashboard → Connect → Instagram → Embedded Signup (login con cuenta de IG Business asociada a una página de Facebook)
+3. Dashboard → Connect → WhatsApp → Embedded Signup (vincula a un WABA + número con OTP)
+4. Settings → API Keys → Create new key
+   - Copiar como `ZERNIO_API_KEY`
+5. Settings → Webhooks → Create
+   - URL: `https://api.financia-chile.cl/webhook/zernio`
+   - Eventos: marca `message.received` (mínimo); agrega `message.read` y `message.failed` si quieres telemetría
+   - Copiar el signing secret como `ZERNIO_WEBHOOK_SECRET`
+6. (Opcional) Para publicar Reels — Settings → Accounts → Instagram → copiar `account_id` y guardarlo como `ZERNIO_IG_ACCOUNT_ID` (env n8n)
+
+Validación rápida:
+```bash
+# Test API key
+curl -H "Authorization: Bearer $ZERNIO_API_KEY" https://api.zernio.com/v1/profiles/me
+# → debería devolver tu perfil
+```
 
 ### Paso 4 — Railway (backend + n8n)
 1. Crear proyecto nuevo
@@ -117,9 +117,9 @@ curl https://api.financia-chile.cl/api/health
 curl https://api.financia-chile.cl/api/cmf/uf
 # → { "value": 38XXX.XX, "date": "2026-XX-XX" }
 
-# Webhook verify (Instagram)
-curl 'https://api.financia-chile.cl/webhook/instagram?hub.mode=subscribe&hub.verify_token=YOUR_TOKEN&hub.challenge=test123'
-# → 200 + body "test123"
+# Webhook reachable (POST sin firma → 401 esperado, NO 404)
+curl -X POST -H "Content-Type: application/json" -d '{}' https://api.financia-chile.cl/webhook/zernio
+# → 401 Unauthorized (significa que la ruta existe y la verificación HMAC funciona)
 
 # Frontend admin loads
 curl -I https://admin.financia-chile.cl

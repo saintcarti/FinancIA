@@ -126,7 +126,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"video_path\": \"/tmp/reel_{{ $now.format('YYYYMMDD') }}.mp4\",\n  \"caption\": \"{{ $node[\\\"Validate JSON\\\"].json.caption }}\",\n  \"hashtags\": {{ JSON.stringify($node[\"Validate JSON\"].json.hashtags) }},\n  \"topic\": \"{{ $node[\\\"Validate JSON\\\"].json.topic }}\",\n  \"script\": \"{{ $node[\\\"Validate JSON\\\"].json.body }}\"\n}",
+        "jsonBody": "={\n  \"video_url\": \"{{ $env.PUBLIC_BASE_URL }}/storage/reels/reel_{{ $now.format('YYYYMMDD') }}.mp4\",\n  \"account_id\": \"{{ $env.ZERNIO_IG_ACCOUNT_ID }}\",\n  \"caption\": \"{{ $node[\\\"Validate JSON\\\"].json.caption }}\",\n  \"hashtags\": {{ JSON.stringify($node[\"Validate JSON\"].json.hashtags) }},\n  \"topic\": \"{{ $node[\\\"Validate JSON\\\"].json.topic }}\",\n  \"script\": \"{{ $node[\\\"Validate JSON\\\"].json.body }}\"\n}",
         "options": { "timeout": 600000 }
       },
       "id": "publish",

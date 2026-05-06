@@ -38,7 +38,7 @@ financia-chile/
 - Cuenta Supabase (free tier)
 - API key Anthropic
 - API key Google AI Studio (embeddings, free)
-- App Meta con permisos Instagram Messaging + WhatsApp Business
+- Cuenta **Zernio** (gestiona Instagram + WhatsApp con 1 sola key, sin developer app de Meta)
 - (Opcional) ElevenLabs free tier para Reels
 
 ### 1. Clonar y configurar
@@ -77,13 +77,13 @@ docker compose up
 - Frontend → http://localhost:3000
 - n8n → http://localhost:5678 (admin/changeme)
 
-### 5. Configurar webhooks Meta (público)
+### 5. Configurar webhook Zernio
 - Necesitas URL pública. Usa `ngrok http 3001` para dev.
-- En Meta Dashboard → tu App → Webhooks:
-  - Subscribe `instagram` events → URL: `https://tu-ngrok.ngrok.io/webhook/instagram`
-  - Verify token = `META_VERIFY_TOKEN` de tu .env
-  - Suscribe a `messages`, `messaging_postbacks`
-- Repetir para WhatsApp
+- En zernio.com → Settings → Webhooks → Create:
+  - URL: `https://tu-ngrok.ngrok.io/webhook/zernio`
+  - Eventos: `message.received`
+  - Copia el signing secret → pégalo como `ZERNIO_WEBHOOK_SECRET` en `.env`
+- En zernio.com → Connect → conecta tu cuenta IG Business + WhatsApp Business via Embedded Signup
 
 ### 6. Probar
 - DM al perfil de IG → recibes respuesta del agente en < 8s
@@ -102,9 +102,10 @@ docker compose up
 | Cache + Queue | Redis (Upstash) + BullMQ |
 | LLM | Claude Haiku 4.5 (90%) + Sonnet 4.6 (10%) |
 | Embeddings | Google text-embedding-004 (free) |
+| IG + WhatsApp | Zernio (1 API key abstrae Meta) |
 | Workflows | n8n self-hosted (Railway) |
 | Deploy | Vercel (frontend) + Railway (backend + n8n) |
-| Monitoring | Sentry + Vercel Analytics |
+| Logging | pino + Railway logs |
 
 ---
 

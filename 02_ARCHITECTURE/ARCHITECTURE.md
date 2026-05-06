@@ -3,18 +3,18 @@
 ## Diagrama lógico (texto)
 
 ```
-                          ┌─────────────────────────┐
-                          │  Instagram (Meta)       │
-                          │  • DM webhook           │
-                          │  • Reel publish API     │
-                          └─────────┬───────────────┘
-                                    │
-                          ┌─────────┴───────────────┐
-                          │  WhatsApp Cloud API     │
-                          │  • Webhook (Meta sig)   │
-                          └─────────┬───────────────┘
-                                    │
-                                    ▼
+        ┌───────────────────────────────────────────────────┐
+        │                  Zernio (proxy unificado)         │
+        │  • Conecta Instagram + WhatsApp con 1 API key     │
+        │  • Recibe DMs/mensajes, los reenvía a nuestro     │
+        │    webhook firmado con HMAC SHA-256               │
+        │  • Expone POST /v1/inbox/conversations/:id        │
+        │    para responder al hilo                         │
+        │  • Maneja Embedded Signup, token rotation,        │
+        │    business verification de Meta por nosotros     │
+        └────────────────────────┬──────────────────────────┘
+                                 │  X-Zernio-Signature
+                                 ▼
    ┌────────────────────────────────────────────────────────────┐
    │  Backend Express (Node.js + TypeScript)                    │
    │                                                             │
@@ -120,7 +120,7 @@
 
 ### 6. Integrations
 - **Anthropic SDK** — con prompt caching, tool use, streaming
-- **Meta Graph API** — Instagram Messaging + WhatsApp Cloud
+- **Zernio API** — capa unificada para Instagram DM + WhatsApp Business (reemplaza la integración directa con Meta Graph API). Ver `lib/zernio.ts`.
 - **CMF API** — endpoints públicos `https://api.cmfchile.cl/api-sbifv3`
 
 ## Decisiones arquitectónicas clave (resumen)
@@ -139,22 +139,29 @@
 
 ## Dataflows críticos
 
-### Flow 1: Usuario envía DM en Instagram
+### Flow 1: Usuario envía DM en Instagram (vía Zernio)
 ```
-1. Meta POST /webhook/instagram (HMAC X-Hub-Signature-256)
-2. Backend verifica firma → reject si falla
-3. Extract message + sender_id
-4. Rate limit check (Redis sliding window 20/día)
-5. Persist user message → Supabase `messages`
-6. Load conversation context (últimas 10 turns) → Redis primero, fallback Supabase
-7. Classify complexity (Haiku 200 tokens) → simple | complex
-8. RAG retrieval (pgvector top-k=5 + BM25 top-k=5 → re-rank)
-9. Call agent (Haiku o Sonnet) con prompt + memory + RAG + tools
-10. Si tool call → ejecutar (verify_entity, compare_rates, complaint_guide)
-11. Generar respuesta final + footer disclaimer
-12. POST a Meta Graph API → enviar mensaje
-13. Persist bot message + cost log → Supabase
-14. Async: actualizar conversation summary cada 5 turns
+1. Zernio POST /webhook/zernio con event=message.received
+   Headers: X-Zernio-Signature (HMAC SHA-256 hex), X-Zernio-Event-Id
+   Body: { id, event, message, conversation, account, timestamp }
+2. Backend verifica firma con ZERNIO_WEBHOOK_SECRET → reject 401 si falla
+3. Detectar account.platform = 'instagram' | 'whatsapp'
+4. Extract message.text + conversation.id + sender id
+5. Encolar job en BullMQ con jobId=zernio:<eventId> (idempotencia)
+6. Responder 200 a Zernio (must be < 5s)
+--- worker async ---
+7. Rate limit check (Redis sliding window 20/día)
+8. Persist user message → Supabase `messages`
+9. Guardar provider_conversation_id en `conversations`
+10. Load conversation context (últimas 6 turns) + summary
+11. Classify complexity (Haiku 200 tokens) → simple | complex
+12. RAG retrieval (hybrid pgvector + BM25 → top 5)
+13. Call agent (Haiku o Sonnet) con prompt + memory + RAG + tools
+14. Si tool call → ejecutar (verify_entity, compare_rates, etc.)
+15. Generar respuesta final + footer disclaimer (auto-injected)
+16. POST a Zernio /v1/inbox/conversations/:id/messages → reply
+17. Persist bot message + cost log → Supabase
+18. Async: actualizar conversation summary cada 5 turns
 ```
 
 ### Flow 2: Generación diaria de Reel

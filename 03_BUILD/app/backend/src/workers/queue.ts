@@ -16,22 +16,8 @@ export function startMessageWorker(): Worker {
   const worker = new Worker(
     'messages',
     async (job) => {
-      const { channel, externalUserId, metaMessageId, text, timestamp } = job.data as {
-        channel: 'instagram' | 'whatsapp';
-        externalUserId: string;
-        metaMessageId: string;
-        text: string;
-        timestamp: number;
-      };
-
-      const { handleInstagramMessage } = await import('../webhooks/instagram.js');
-      const { handleWhatsAppMessage } = await import('../webhooks/whatsapp.js');
-
-      if (channel === 'instagram') {
-        await handleInstagramMessage({ externalUserId, metaMessageId, text, timestamp });
-      } else {
-        await handleWhatsAppMessage({ externalUserId, metaMessageId, text, timestamp });
-      }
+      const { handleZernioMessage } = await import('../webhooks/zernio.js');
+      await handleZernioMessage(job.data);
     },
     { connection, concurrency: 8 }
   );

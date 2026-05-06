@@ -2,12 +2,8 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 beforeAll(() => {
   Object.assign(process.env, {
-    META_APP_SECRET: 'test_secret_long_enough_for_validation',
-    META_VERIFY_TOKEN: 'verify123',
-    META_PAGE_ACCESS_TOKEN: 'page_access_token_long_enough',
-    IG_USER_ID: '12345',
-    WHATSAPP_PHONE_NUMBER_ID: '67890',
-    WHATSAPP_ACCESS_TOKEN: 'wa_access_token_long_enough',
+    ZERNIO_API_KEY: 'zer_' + 'x'.repeat(20),
+    ZERNIO_WEBHOOK_SECRET: 'whsec_' + 'a'.repeat(20),
     SUPABASE_URL: 'https://x.supabase.co',
     SUPABASE_SERVICE_ROLE_KEY: 'service_role_key_long_enough',
     SUPABASE_ANON_KEY: 'anon_key_long_enough',

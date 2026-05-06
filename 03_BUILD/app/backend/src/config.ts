@@ -24,13 +24,10 @@ const Schema = z.object({
   GOOGLE_AI_STUDIO_API_KEY: z.string().min(20),
   EMBEDDING_MODEL: z.string().default('text-embedding-004'),
 
-  // Meta — Instagram + WhatsApp
-  META_APP_SECRET: z.string().min(20),
-  META_VERIFY_TOKEN: z.string().min(8),
-  META_PAGE_ACCESS_TOKEN: z.string().min(20),
-  IG_USER_ID: z.string().min(5),
-  WHATSAPP_PHONE_NUMBER_ID: z.string().min(5),
-  WHATSAPP_ACCESS_TOKEN: z.string().min(20),
+  // Zernio — gestor unificado IG + WhatsApp
+  ZERNIO_API_KEY: z.string().min(10),
+  ZERNIO_WEBHOOK_SECRET: z.string().min(10),
+  ZERNIO_BASE_URL: z.string().url().default('https://api.zernio.com'),
 
   // CMF
   CMF_API_KEY: z.string().optional(),
@@ -38,9 +35,6 @@ const Schema = z.object({
 
   // Internal
   INTERNAL_SECRET: z.string().min(16),
-
-  // Sentry
-  SENTRY_DSN: z.string().url().optional(),
 
   // Limits
   RATE_LIMIT_PER_DAY: z.coerce.number().default(20),

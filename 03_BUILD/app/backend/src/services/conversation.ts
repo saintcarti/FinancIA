@@ -7,20 +7,21 @@ import type Anthropic from '@anthropic-ai/sdk';
 export interface IncomingMessage {
   externalUserId: string;
   channel: 'instagram' | 'whatsapp';
-  metaMessageId: string;
+  metaMessageId: string;            // Zernio event id (mantenemos el nombre por idempotencia DB)
   text: string;
   timestamp: number;
+  conversationProviderId?: string;  // Zernio conversation.id (necesario para reply)
 }
 
 const RECENT_TURNS_KEEP = 6;
-const SUMMARIZE_AFTER = 5; // resumir cuando hay 5+ turnos sin sumarizar
+const SUMMARIZE_AFTER = 5;
 
-/** Idempotencia: claim el meta_message_id. Devuelve true si es nuevo, false si ya estaba. */
-export async function claimWebhook(metaMessageId: string, channel: string): Promise<boolean> {
+/** Idempotencia: claim el event id. true = nuevo, false = ya procesado. */
+export async function claimWebhook(eventId: string, channel: string): Promise<boolean> {
   const { error } = await supabase()
     .from('processed_webhooks')
-    .insert({ meta_message_id: metaMessageId, channel });
-  if (error?.code === '23505') return false; // unique violation → ya procesado
+    .insert({ meta_message_id: eventId, channel });
+  if (error?.code === '23505') return false;
   if (error) {
     logger.error({ err: error.message }, 'claimWebhook failed');
     return false;
@@ -28,7 +29,6 @@ export async function claimWebhook(metaMessageId: string, channel: string): Prom
   return true;
 }
 
-/** Upsert app_user y devuelve user_id (UUID interno). */
 export async function ensureUser(externalId: string, channel: string): Promise<string> {
   const sb = supabase();
   const { data: existing } = await sb
@@ -52,8 +52,11 @@ export async function ensureUser(externalId: string, channel: string): Promise<s
   return data.id;
 }
 
-/** Trae la conversación abierta más reciente o crea una nueva. */
-export async function getOrCreateConversation(userId: string, channel: string): Promise<{
+export async function getOrCreateConversation(
+  userId: string,
+  channel: string,
+  providerConversationId?: string
+): Promise<{
   id: string;
   summary: string;
   recentMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -61,23 +64,33 @@ export async function getOrCreateConversation(userId: string, channel: string): 
   const sb = supabase();
   const { data: latest } = await sb
     .from('conversations')
-    .select('id, summary, last_message_at')
+    .select('id, summary, last_message_at, provider_conversation_id')
     .eq('user_id', userId)
     .order('last_message_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  // Si la última conversación es < 12h vieja, continuamos. Si no, abrimos nueva.
   const STALE_HOURS = 12;
   let conversationId: string;
   let summary = '';
   if (latest && Date.now() - new Date(latest.last_message_at).getTime() < STALE_HOURS * 3600_000) {
     conversationId = latest.id;
     summary = latest.summary ?? '';
+    // Refresh provider_conversation_id si Zernio lo cambió
+    if (providerConversationId && providerConversationId !== latest.provider_conversation_id) {
+      await sb
+        .from('conversations')
+        .update({ provider_conversation_id: providerConversationId })
+        .eq('id', conversationId);
+    }
   } else {
     const { data: created, error } = await sb
       .from('conversations')
-      .insert({ user_id: userId, channel })
+      .insert({
+        user_id: userId,
+        channel,
+        provider_conversation_id: providerConversationId ?? null
+      })
       .select('id')
       .single();
     if (error || !created) throw new Error(`create conv failed: ${error?.message}`);
@@ -121,7 +134,6 @@ export async function persistMessage(opts: {
   return data.id;
 }
 
-/** Si pasaron N turnos desde el último resumen, re-sumarizar async. */
 export async function maybeSummarize(conversationId: string): Promise<void> {
   const sb = supabase();
   const { data: conv } = await sb
@@ -135,7 +147,6 @@ export async function maybeSummarize(conversationId: string): Promise<void> {
     ? Math.floor((Date.now() - new Date(conv.summary_updated_at).getTime()) / 60000)
     : Infinity;
 
-  // Resumir si han pasado 5+ mensajes y al menos 1 minuto desde el último resumen
   if (conv.message_count < SUMMARIZE_AFTER || since < 1) return;
 
   const { data: msgs } = await sb
@@ -162,7 +173,6 @@ export async function maybeSummarize(conversationId: string): Promise<void> {
   }
 }
 
-/** Procesa un mensaje entrante punto a punto. */
 export async function processIncomingMessage(msg: IncomingMessage): Promise<{
   reply: string;
   conversationId: string;
@@ -176,7 +186,6 @@ export async function processIncomingMessage(msg: IncomingMessage): Promise<{
 
   const userId = await ensureUser(msg.externalUserId, msg.channel);
 
-  // Verificar si el bot está pausado (human-in-loop)
   const { data: u } = await supabase()
     .from('app_users')
     .select('human_in_loop_until')
@@ -188,9 +197,8 @@ export async function processIncomingMessage(msg: IncomingMessage): Promise<{
     return { reply: '', conversationId: '', bot_paused: true };
   }
 
-  const conv = await getOrCreateConversation(userId, msg.channel);
+  const conv = await getOrCreateConversation(userId, msg.channel, msg.conversationProviderId);
 
-  // Persistir user message
   await persistMessage({
     conversationId: conv.id,
     role: 'user',
@@ -198,7 +206,6 @@ export async function processIncomingMessage(msg: IncomingMessage): Promise<{
     metaMessageId: msg.metaMessageId
   });
 
-  // Convertir recent messages a Anthropic format
   const recentHistory: Anthropic.MessageParam[] = conv.recentMessages.map((m) => ({
     role: m.role,
     content: m.content
@@ -218,7 +225,6 @@ export async function processIncomingMessage(msg: IncomingMessage): Promise<{
     toolCalls: { tool_calls_made: result.tool_calls_made, rag_top_score: result.rag_top_score }
   });
 
-  // Resumir async (no bloquea respuesta)
   maybeSummarize(conv.id).catch(() => {});
 
   return { reply: result.text, conversationId: conv.id, bot_paused: false };

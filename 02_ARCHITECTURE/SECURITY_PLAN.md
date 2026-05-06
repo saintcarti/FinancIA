@@ -17,12 +17,12 @@
 ## Secrets management
 
 ### Categorías
-- **Cliente Meta:** `META_APP_SECRET`, `META_PAGE_ACCESS_TOKEN`, `META_VERIFY_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`
+- **Zernio (gestiona IG + WhatsApp):** `ZERNIO_API_KEY`, `ZERNIO_WEBHOOK_SECRET`
 - **Anthropic:** `ANTHROPIC_API_KEY`
 - **Google:** `GOOGLE_AI_STUDIO_API_KEY` (embeddings)
 - **Supabase:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (backend), `NEXT_PUBLIC_SUPABASE_ANON_KEY` (frontend)
-- **Internal:** `INTERNAL_SECRET` (service-to-service), `WEBHOOK_VERIFY_TOKEN`
-- **External:** `CMF_API_KEY` (si aplica), `SENTRY_DSN`, `ELEVENLABS_API_KEY`
+- **Internal:** `INTERNAL_SECRET` (service-to-service)
+- **External:** `CMF_API_KEY` (si aplica), `ELEVENLABS_API_KEY`
 
 ### Storage
 - **Dev:** archivo `.env.local` git-ignored
@@ -31,24 +31,29 @@
 
 ### Rotación
 - Anthropic + Google: cada 90 días
-- Meta: cada 60 días (token de larga duración)
+- Zernio API key: cada 90 días (rotable desde dashboard)
+- Zernio webhook secret: cada 90 días (rotable; configurar nuevo, validar, deprecar viejo)
+- Supabase service_role: en compromiso (Project Settings → API → Reset)
 - Internal secret: cada release
 - Si leak detectado → rotar inmediato + revisar logs últimos 30 días
 
-## HMAC verification (webhook)
+## HMAC verification (webhook Zernio)
 
 ```typescript
-function verifyMetaSignature(body: Buffer, signature: string, appSecret: string): boolean {
-  if (!signature?.startsWith('sha256=')) return false;
+function verifyZernioSignature(body: Buffer, signature: string | undefined): boolean {
+  if (!signature) return false;
+  const sig = signature.startsWith('sha256=') ? signature.slice(7) : signature;
   const expected = crypto
-    .createHmac('sha256', appSecret)
+    .createHmac('sha256', process.env.ZERNIO_WEBHOOK_SECRET!)
     .update(body)
     .digest('hex');
-  const provided = signature.slice(7);
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
+  if (expected.length !== sig.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(sig, 'hex'));
 }
 ```
-Aplicado **antes** de parsear JSON. Rechaza con 401.
+- Header: `X-Zernio-Signature`
+- Algoritmo: HMAC SHA-256 (lowercase hex)
+- Aplicado **antes** de parsear JSON. Rechaza con 401.
 
 ## Rate limiting
 

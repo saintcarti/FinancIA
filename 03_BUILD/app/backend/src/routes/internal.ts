@@ -3,7 +3,7 @@ import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
 import { reelQueue, ingestQueue } from '../workers/queue.js';
 import { supabase } from '../lib/supabase.js';
-import { publishInstagramReel } from '../lib/meta.js';
+import { publishInstagramReel } from '../lib/zernio.js';
 
 export const internalRouter = Router();
 
@@ -18,18 +18,26 @@ function requireInternalSecret(req: Request, res: Response, next: NextFunction):
 internalRouter.use(requireInternalSecret);
 
 internalRouter.post('/reel/publish', async (req, res) => {
-  const { video_path, caption, hashtags, topic, script } = req.body as {
-    video_path: string; caption: string; hashtags: string[]; topic: string; script: string;
+  const { video_url, caption, hashtags, topic, script, account_id } = req.body as {
+    video_url: string;
+    caption: string;
+    hashtags: string[];
+    topic: string;
+    script: string;
+    account_id: string; // Zernio account id de Instagram
   };
   try {
     const fullCaption = `${caption}\n\n${(hashtags ?? []).map((h) => '#' + h.replace(/^#/, '')).join(' ')}`;
-    // En producción: video_path debería ser una URL pública (Supabase Storage signed URL)
-    const result = await publishInstagramReel({ videoUrl: video_path, caption: fullCaption });
+    const result = await publishInstagramReel({
+      accountId: account_id,
+      videoUrl: video_url,
+      caption: fullCaption
+    });
     await supabase().from('videos').insert({
       script,
       caption: fullCaption,
       hashtags,
-      asset_url: video_path,
+      asset_url: video_url,
       ig_media_id: result.media_id,
       published_at: new Date().toISOString(),
       topic
