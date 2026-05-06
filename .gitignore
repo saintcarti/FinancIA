@@ -26,3 +26,4 @@ __pycache__/
 .pytest_cache/
 .cache/
 out/
+ci-workflow-pendiente.yml

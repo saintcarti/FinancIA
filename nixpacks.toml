@@ -1,0 +1,17 @@
+# Nixpacks config para Railway monorepo.
+# El backend vive en 03_BUILD/app/backend/.
+# Esta config asegura que: instala deps en el sub-folder, compila TS, y arranca node desde dist.
+
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-10_x"]
+
+[phases.install]
+cmds = ["cd 03_BUILD/app/backend && npm install --no-audit --no-fund"]
+
+[phases.build]
+cmds = ["cd 03_BUILD/app/backend && npm run build"]
+
+[start]
+cmd = "cd 03_BUILD/app/backend && node dist/index.js"

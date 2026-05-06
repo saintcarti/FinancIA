@@ -19,7 +19,7 @@ services:
       REDIS_URL: redis://redis:6379
     depends_on: [redis]
     volumes:
-      - ./03_BUILD/prompts:/app/prompts:ro
+      - ./03_BUILD/app/backend/prompts:/app/prompts:ro
 
   frontend:
     build: ./03_BUILD/app/frontend
