@@ -1,17 +1,23 @@
 # Nixpacks config para Railway monorepo.
 # El backend vive en 03_BUILD/app/backend/.
-# Esta config asegura que: instala deps en el sub-folder, compila TS, y arranca node desde dist.
 
 providers = ["node"]
+
+# Railway por defecto setea NODE_ENV=production durante el build, lo que hace que
+# npm install excluya devDependencies (incluyendo typescript/tsc). Forzamos a que
+# devDeps SÍ se instalen durante build — quedan disponibles para `tsc`.
+[variables]
+NPM_CONFIG_PRODUCTION = "false"
+NODE_ENV = "development"
 
 [phases.setup]
 nixPkgs = ["nodejs_20", "npm-10_x"]
 
 [phases.install]
-cmds = ["cd 03_BUILD/app/backend && npm install --no-audit --no-fund"]
+cmds = ["cd 03_BUILD/app/backend && npm install --include=dev --no-audit --no-fund"]
 
 [phases.build]
 cmds = ["cd 03_BUILD/app/backend && npm run build"]
 
 [start]
-cmd = "cd 03_BUILD/app/backend && node dist/index.js"
+cmd = "cd 03_BUILD/app/backend && NODE_ENV=production node dist/index.js"
