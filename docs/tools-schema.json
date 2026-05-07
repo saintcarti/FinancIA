@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FinancIA Chile — Tools Schema",
+  "description": "JSON Schema de los 4 tools que el agente Claude usa para responder consultas regulatorias. Cada entry sigue el formato Anthropic.Tool (https://docs.claude.com/en/docs/agents-and-tools/tool-use).",
+  "version": "1.0.0",
+  "last_updated": "2026-05-07",
+  "tools": [
+    {
+      "name": "get_indicator",
+      "description": "Devuelve el valor actual de un indicador económico chileno: UF, IPC, TPM, dólar observado, euro o UTM. Úsala SIEMPRE que el usuario pregunte por el valor de uno de estos indicadores hoy o en una fecha específica. No inventes valores numéricos.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "indicator": {
+            "type": "string",
+            "enum": ["uf", "ipc", "tpm", "dolar", "euro", "utm"]
+          },
+          "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD opcional; default hoy. Para IPC y UTM usar YYYY-MM."
+          }
+        },
+        "required": ["indicator"]
+      },
+      "output_example": {
+        "value": 38502.12,
+        "date": "2026-05-07"
+      }
+    },
+    {
+      "name": "verify_entity",
+      "description": "Verifica si una institución financiera está supervisada por la CMF de Chile. Úsala cuando el usuario menciona el nombre de un banco, cooperativa, financiera, AFP, compañía de seguros, fondo, o cualquier entidad que ofrezca productos financieros. Especialmente útil ante posibles estafas (entidad que llama ofreciendo crédito).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name_or_rut": {
+            "type": "string",
+            "description": "Nombre comercial o RUT de la entidad"
+          }
+        },
+        "required": ["name_or_rut"]
+      },
+      "output_example": {
+        "supervised": true,
+        "matched_name": "Banco de Chile",
+        "source": "local"
+      }
+    },
+    {
+      "name": "compare_rates",
+      "description": "Compara una tasa que el usuario describe contra la Tasa Máxima Convencional (TMC) vigente fijada por la CMF. Úsala cuando el usuario pregunta si una tasa es legal, si lo cobran de más, o si una oferta es razonable.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "product_type": {
+            "type": "string",
+            "enum": ["consumo", "linea_credito", "tarjeta_credito", "automotriz", "hipotecario"]
+          },
+          "amount_clp": {
+            "type": "number",
+            "minimum": 0
+          },
+          "term_months": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "offered_rate_annual_pct": {
+            "type": "number"
+          }
+        },
+        "required": ["product_type", "amount_clp", "term_months", "offered_rate_annual_pct"]
+      },
+      "output_example": {
+        "offered_rate": 50.0,
+        "tmc": 36.0,
+        "reference_period": "2026-05",
+        "exceeds_tmc": true,
+        "assessment": "La tasa ofrecida supera la TMC vigente. Eso significa que excede el límite legal — el usuario debería revisar y eventualmente reclamar."
+      }
+    },
+    {
+      "name": "generate_complaint_guide",
+      "description": "Genera una guía paso a paso para que el usuario presente un reclamo formal ante la institución, CMF o SERNAC, según el tipo de problema reportado.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "institution": {
+            "type": "string",
+            "minLength": 2
+          },
+          "issue_type": {
+            "type": "string",
+            "enum": [
+              "cobro_indebido",
+              "seguro_no_autorizado",
+              "datos_dicom",
+              "publicidad_enganosa",
+              "negativa_atencion",
+              "otro"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "description": "Resumen del problema en 1-2 frases",
+            "minLength": 5
+          }
+        },
+        "required": ["institution", "issue_type", "summary"]
+      },
+      "output_example": {
+        "institucion": "Banco X",
+        "tipo": "cobro_indebido",
+        "resumen_caso": "Cobro de comisión no informada en cartola de marzo",
+        "pasos": [
+          {
+            "paso": 1,
+            "titulo": "Reclamo formal a la institución",
+            "detalle": "Envía reclamo escrito a Banco X usando su canal oficial. Guarda número de ticket. Por ley tienen 10 días hábiles (Ley 19.496)."
+          },
+          {
+            "paso": 2,
+            "titulo": "Si no responden o respuesta insatisfactoria → CMF",
+            "detalle": "Presenta reclamo en cmfchile.cl → 'Reclamos en línea'. CMF tiene 15 días hábiles."
+          },
+          {
+            "paso": 3,
+            "titulo": "En paralelo (recomendable) → SERNAC",
+            "detalle": "SERNAC también recibe reclamos financieros y puede mediar."
+          }
+        ],
+        "documentos_recomendados": [
+          "Adjunta cartola con cargo marcado",
+          "Adjunta autorización original (si tienes contrato firmado, debe constar)"
+        ],
+        "plazo_total_estimado": "15 a 45 días hábiles",
+        "base_legal": [
+          "Ley 19.496 — Derechos del Consumidor",
+          "Ley 21.521 — Fintech",
+          "Compendio CMF"
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "max_iterations_per_conversation": 4,
+    "validation": "double — JSON Schema (sent to Claude) + Zod (runtime in backend)",
+    "source_file": "03_BUILD/app/backend/src/agents/tools.ts",
+    "executor_function": "executeTool(name, input)",
+    "wired_in": "03_BUILD/app/backend/src/agents/qa.ts",
+    "tests": "03_BUILD/app/backend/tests/tools.test.ts"
+  }
+}
