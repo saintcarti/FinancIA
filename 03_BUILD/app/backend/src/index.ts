@@ -21,6 +21,16 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(morgan(cfg.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+// Compat: si Zernio se configuró con la URL del root (sin /webhook/zernio),
+// reescribimos POST / a /webhook/zernio para no perder mensajes.
+// El header X-Zernio-Signature confirma que es un webhook real, no tráfico externo.
+app.use((req, _res, next) => {
+  if (req.method === 'POST' && req.path === '/' && req.headers['x-zernio-signature']) {
+    req.url = '/webhook/zernio';
+  }
+  next();
+});
+
 // Webhook Zernio usa raw body — montar ANTES del json parser global
 app.use('/webhook/zernio', zernioRouter);
 
