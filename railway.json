@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "cd 03_BUILD/app/backend && node dist/index.js",
+    "startCommand": "cd 03_BUILD/app/backend && NODE_ENV=production node dist/index.js",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",

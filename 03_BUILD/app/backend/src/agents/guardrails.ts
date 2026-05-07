@@ -22,8 +22,14 @@ export const DISCLAIMER =
   'No constituye asesoría financiera personalizada ni recomendación de inversión. ' +
   'Para decisiones consulta a un asesor certificado._';
 
-/** Aplica disclaimer al final si no está ya. */
+/** Aplica disclaimer al final si no está ya.
+ * Acepta dos formas para evitar duplicación:
+ * 1. El texto termina con el DISCLAIMER canónico (FAQ pre-saved con disclaimer al final)
+ * 2. El texto contiene la frase clave en cualquier parte (modelo lo escribió manualmente)
+ */
 export function applyDisclaimer(text: string): string {
-  if (text.includes('No constituye asesoría financiera')) return text;
-  return text.trimEnd() + DISCLAIMER;
+  const trimmed = text.trimEnd();
+  if (trimmed.endsWith(DISCLAIMER.trim())) return text;
+  if (trimmed.includes('No constituye asesoría financiera')) return text;
+  return trimmed + DISCLAIMER;
 }

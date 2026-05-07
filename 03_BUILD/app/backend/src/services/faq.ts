@@ -37,18 +37,25 @@ export async function lookupFaq(userQuery: string): Promise<FaqMatch | null> {
     const top = (data ?? [])[0] as FaqMatch | undefined;
     if (!top || top.similarity < SIMILARITY_THRESHOLD) return null;
 
-    // Increment hit count async
-    supabase()
-      .from('faq_cache')
-      .update({ hit_count: (await getCurrentHitCount(top.id)) + 1, updated_at: new Date().toISOString() })
-      .eq('id', top.id)
-      .then(() => {}, () => {});
+    // Increment hit count — fire-and-forget pero con logging si falla
+    incrementHitCount(top.id).catch((e) => {
+      logger.warn({ err: e.message, faq_id: top.id }, 'faq hit_count increment failed');
+    });
 
     return top;
   } catch (e) {
     logger.warn({ err: (e as Error).message }, 'faq lookup failed');
     return null;
   }
+}
+
+async function incrementHitCount(id: string): Promise<void> {
+  const current = await getCurrentHitCount(id);
+  const { error } = await supabase()
+    .from('faq_cache')
+    .update({ hit_count: current + 1, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 async function getCurrentHitCount(id: string): Promise<number> {

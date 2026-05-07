@@ -62,7 +62,10 @@ zernioRouter.post('/', async (req: Request, res: Response) => {
         externalUserId: ev.message.sender?.id ?? ev.conversation.id,
         zernioEventId: eventId ?? ev.id,
         text,
-        timestamp: new Date(ev.timestamp).getTime() || Date.now()
+        timestamp: (() => {
+          const t = new Date(ev.timestamp).getTime();
+          return Number.isFinite(t) ? t : Date.now();
+        })()
       },
       {
         jobId: `zernio:${ev.id}`,
@@ -84,6 +87,15 @@ export async function handleZernioMessage(data: {
   text: string;
   timestamp: number;
 }): Promise<void> {
+  // Guard: sin conversationId no podemos responder. Loguear y abortar.
+  if (!data.conversationId) {
+    logger.error(
+      { eventId: data.zernioEventId, externalUserId: data.externalUserId },
+      'zernio webhook missing conversation.id, cannot reply — message dropped'
+    );
+    return;
+  }
+
   const rl = await checkRateLimit(data.externalUserId);
   if (!rl.ok) {
     await replyToConversation(

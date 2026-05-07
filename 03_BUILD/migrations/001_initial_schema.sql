@@ -1,5 +1,8 @@
--- FinancIA Chile — schema inicial
--- Aplicar en Supabase via SQL editor o `supabase db push`
+-- ⚠️ DEPRECATED — usa migrations/all.sql (idempotente, consolidado, incluye RPCs y faq_cache).
+-- Este archivo se mantiene por trazabilidad de la migration history inicial. NO lo apliques directamente.
+-- Si estás haciendo setup limpio: corre `migrations/all.sql` en Supabase SQL Editor y listo.
+
+-- FinancIA Chile — schema inicial (LEGACY)
 
 -- Extensiones
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

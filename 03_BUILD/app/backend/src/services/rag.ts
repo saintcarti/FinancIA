@@ -30,9 +30,10 @@ export async function retrieve(query: string, k: number = 5): Promise<RetrievedC
   }
 
   const results = (data ?? []) as RetrievedChunk[];
-  // Filtrar resultados muy débiles
+  // Filtrar resultados muy débiles. Threshold 0.55 evita inyectar contexto irrelevante
+  // que el modelo podría tomar como verdad. La señal `low_confidence` en qa.ts cubre 0.55-0.65.
   return results
-    .filter((r) => r.combined_score > 0.35)
+    .filter((r) => r.combined_score > 0.55)
     .slice(0, k);
 }
 

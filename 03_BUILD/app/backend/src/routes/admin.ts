@@ -1,14 +1,20 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
 import { replyToConversation } from '../lib/zernio.js';
 import { reelQueue, ingestQueue } from '../workers/queue.js';
 
+/** Request extendido con el admin user resuelto por requireAdmin middleware. */
+interface AdminRequest extends Request {
+  adminUser?: User;
+}
+
 export const adminRouter = Router();
 
 // Auth middleware: valida JWT Supabase y verifica si email está en admin_emails
-async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+async function requireAdmin(req: AdminRequest, res: Response, next: NextFunction): Promise<void> {
   const auth = req.header('Authorization');
   if (!auth?.startsWith('Bearer ')) {
     res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'missing bearer' } });
@@ -29,7 +35,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction): Pr
     res.status(403).json({ error: { code: 'FORBIDDEN', message: 'not admin' } });
     return;
   }
-  (req as any).adminUser = data.user;
+  req.adminUser = data.user;
   next();
 }
 
@@ -69,7 +75,7 @@ adminRouter.get('/conversations/:id', async (req, res) => {
   res.json({ conversation: conv, messages: msgs, total_cost_usd: total_cost });
 });
 
-adminRouter.post('/conversations/:id/override', async (req, res) => {
+adminRouter.post('/conversations/:id/override', async (req: AdminRequest, res) => {
   const { message } = req.body as { message?: string };
   if (!message?.trim()) return res.status(400).json({ error: { message: 'message required' } });
 
@@ -80,6 +86,14 @@ adminRouter.post('/conversations/:id/override', async (req, res) => {
     .single();
   if (!conv) return res.status(404).json({ error: { message: 'not found' } });
   if (!conv.provider_conversation_id) {
+    // Audit log explícito del fail para que admin lo vea
+    await supabase().from('audit_log').insert({
+      actor_email: req.adminUser?.email,
+      action: 'override_message_failed',
+      target_type: 'conversation',
+      target_id: req.params.id,
+      payload: { reason: 'no_provider_conversation_id', message_preview: message.slice(0, 100) }
+    });
     return res.status(409).json({ error: { message: 'conversation has no provider id, cannot reply' } });
   }
 
@@ -95,11 +109,11 @@ adminRouter.post('/conversations/:id/override', async (req, res) => {
     conversation_id: req.params.id,
     role: 'assistant',
     content: `[OPERATOR] ${message}`,
-    tool_calls: { override_by: (req as any).adminUser?.email }
+    tool_calls: { override_by: req.adminUser?.email }
   });
 
   await supabase().from('audit_log').insert({
-    actor_email: (req as any).adminUser?.email,
+    actor_email: req.adminUser?.email,
     action: 'override_message',
     target_type: 'conversation',
     target_id: req.params.id,
@@ -162,11 +176,11 @@ adminRouter.get('/cost-summary', async (req, res) => {
   res.json({ summary: data ?? [] });
 });
 
-adminRouter.post('/users/:externalId/block', async (req, res) => {
+adminRouter.post('/users/:externalId/block', async (req: AdminRequest, res) => {
   const { externalId } = req.params;
   await supabase().from('app_users').update({ blocked: true }).eq('external_id', externalId);
   await supabase().from('audit_log').insert({
-    actor_email: (req as any).adminUser?.email,
+    actor_email: req.adminUser?.email,
     action: 'block_user',
     target_type: 'user',
     payload: { external_id: externalId }
@@ -174,12 +188,12 @@ adminRouter.post('/users/:externalId/block', async (req, res) => {
   res.json({ ok: true });
 });
 
-adminRouter.delete('/users/:externalId', async (req, res) => {
+adminRouter.delete('/users/:externalId', async (req: AdminRequest, res) => {
   // Right to erasure
   const { externalId } = req.params;
   await supabase().from('app_users').delete().eq('external_id', externalId);
   await supabase().from('audit_log').insert({
-    actor_email: (req as any).adminUser?.email,
+    actor_email: req.adminUser?.email,
     action: 'delete_user',
     target_type: 'user',
     payload: { external_id: externalId }

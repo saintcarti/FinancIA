@@ -16,16 +16,15 @@ financia-chile/
 ├── 02_ARCHITECTURE/    # Specs técnicas, ADRs, RAG, LLM, security, n8n
 ├── 03_BUILD/
 │   ├── app/
-│   │   ├── backend/    # Express + TypeScript: webhooks, agente, RAG
+│   │   ├── backend/    # Express + TypeScript (incluye prompts/, scripts/, tests/)
 │   │   └── frontend/   # Next.js admin dashboard
 │   ├── n8n-workflows/  # 4 workflows JSON exportables
-│   ├── prompts/        # System prompts versionados
-│   ├── migrations/     # SQL Supabase
-│   └── tests/          # Vitest
+│   └── migrations/     # SQL Supabase (all.sql consolidado)
 ├── 04_GTM/             # Landing copy, social, PR, Product Hunt
 ├── 05_DEPLOY/          # Manifests, runbooks, ENV vars
 ├── docker-compose.yml  # Dev local
-└── .github/workflows/  # CI
+├── railway.json        # Config deploy Railway
+└── nixpacks.toml       # Config build Nixpacks
 ```
 
 ---

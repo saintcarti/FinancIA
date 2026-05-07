@@ -124,18 +124,40 @@ export async function rollupDailyMetrics(daysBack = 7): Promise<number> {
 }
 
 /** Lanza cleanup en intervalos. Llamar 1 vez en startup. */
-export function startCleanupCron(): void {
-  // Cada hora: purge webhooks + rollup (acumulativo)
-  setInterval(() => {
-    purgeOldWebhooks().catch(() => {});
-    rollupDailyMetrics(2).catch(() => {});
-  }, 60 * 60_000);
+let cleanupTimers: NodeJS.Timeout[] = [];
+let lastRedactDay = '';
 
-  // Cada día (a las 4am UTC): redact messages
-  setInterval(() => {
-    const h = new Date().getUTCHours();
-    if (h === 4) redactOldMessages().catch(() => {});
-  }, 60 * 60_000);
+export function startCleanupCron(): void {
+  // Defensa contra doble inicio
+  if (cleanupTimers.length > 0) {
+    logger.warn('cleanup cron already started, skipping');
+    return;
+  }
+
+  // Cada hora: purge webhooks + rollup (acumulativo)
+  cleanupTimers.push(
+    setInterval(() => {
+      purgeOldWebhooks().catch(() => {});
+      rollupDailyMetrics(2).catch(() => {});
+    }, 60 * 60_000)
+  );
+
+  // Cada hora chequea si es ventana diaria (UTC 4am) — solo se ejecuta una vez por día
+  cleanupTimers.push(
+    setInterval(() => {
+      const today = new Date().toISOString().slice(0, 10);
+      if (new Date().getUTCHours() === 4 && lastRedactDay !== today) {
+        lastRedactDay = today;
+        redactOldMessages().catch(() => {});
+      }
+    }, 60 * 60_000)
+  );
 
   logger.info('cleanup cron started');
+}
+
+/** Detiene crons (útil para tests y graceful shutdown). */
+export function stopCleanupCron(): void {
+  cleanupTimers.forEach((t) => clearInterval(t));
+  cleanupTimers = [];
 }

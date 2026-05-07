@@ -149,9 +149,19 @@ export async function runQA(opts: RunOpts): Promise<RunResult> {
 
   // Fallback si quedó vacío
   if (!finalText.trim()) {
-    finalText =
-      'Disculpa, no pude generar una respuesta clara para tu consulta. ' +
-      'Puedes reformularla o consultar directamente en CMF Educa: https://www.cmfchile.cl/educa/621/w3-channel.html';
+    if (iterations >= MAX_ITERATIONS) {
+      logger.warn(
+        { iterations, toolCallsMade, conversationId: opts.conversationId, model },
+        'agent exceeded max iterations without final text'
+      );
+      finalText =
+        'Tu pregunta requiere más análisis del que puedo hacer en una sola respuesta. ' +
+        '¿Puedes reformularla en partes más pequeñas o ser más específica?';
+    } else {
+      finalText =
+        'Disculpa, no pude generar una respuesta clara para tu consulta. ' +
+        'Puedes reformularla o consultar directamente en CMF Educa: https://www.cmfchile.cl/educa/621/w3-channel.html';
+    }
   }
 
   return {
